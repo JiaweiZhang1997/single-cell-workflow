@@ -1,1 +1,1 @@
-# WES-WGS-workflow
+# single-cell-workflow
