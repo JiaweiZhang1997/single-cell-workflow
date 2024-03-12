@@ -133,7 +133,6 @@ workflow {
         processSeurat(result)
     }
     
-    // 可选：收集并查看Seurat对象的输出路径
     seurat_objs.view()
 
     qc_results = seurat_objs.map { seurat_obj_path ->
