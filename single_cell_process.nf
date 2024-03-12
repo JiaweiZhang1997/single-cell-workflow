@@ -1,81 +1,50 @@
 // nextflow_seurat_workflow.nf
 
 params {
-    patient_id = '4261'
-    fastqs_dir = "./${params.patient_id}_GEX/outs/fastq_path"
-    transcriptome_ref = '/share/home/xxwang/software/cellranger-6.1.2/refdata-gex-GRCh38-2020-A'
-    output_prefix = "${params.patient_id}_GEX"
-    r_script = './process_seurat.R'
-    tcr_fastqs_dir = "./${params.patient_id}_TCR"
-    tcr_reference = '/share/home/xxwang/software/cellranger-6.1.2/refdata-cellranger-vdj-GRCh38-alts-ensembl-5.0.0'
+    patient_id = "4261"
+    current_path = "/share/home/xxwang/data/phs002748.v1.p1/RNA_TIL"
+
+    transcriptome_ref = "/share/home/xxwang/software/cellranger-6.1.2/refdata-gex-GRCh38-2020-A"
+    gex_output_prefix = "${params.patient_id}_GEX"
+    
+    tcr_reference = "/share/home/xxwang/software/cellranger-6.1.2/refdata-cellranger-vdj-GRCh38-alts-ensembl-5.0.0"
+    tcr_output_prefix = "${params.patient_id}_TCR"
+
+    tcr_react = "./react_TCR_list.txt"
+
+    r_seurat = "./process_seurat.R"
+    r_QCandanalyze = "./qc_and_analyze.R"
+    r_addTCR = "./addTCRMetadata.R"
 }
 
 process runCellRangerCount {
-    executor 'local'
+    executor "local"
     cpus 3
-    container 'cellranger:6.1.2'
+    container "cellranger:6.1.2"
 
     input:
     path(fastqs) from file("${fastqs_dir}/*.fastq.gz")
 
     output:
-    dir("${output_prefix}") into cellranger_output
+    dir("${gex_output_prefix}") into cellranger_output
 
     shell:
     """
     cellranger count \\
-        --id ${output_prefix} \\
+        --id "${params.patient_id}_GEX" \\
         --sample ${params.patient_id}_FRTU_TIL_GEX \\
-        --fastqs ${fastqs} \\
-        --transcriptome ${transcriptome_ref} \\
+        --fastqs ${params.current_path}/${params.patient_id} \\
+        --transcriptome ${params.transcriptome_ref} \\
         --disable-ui \\
-        --localcores ${task.cpus}
-    """
-}
-
-process processSeurat {
-    executor 'local'
-    container 'rocker/r-ver:4.1.2'
-
-    input:
-    path filtered_matrix from cellranger_output.flatten().map { dir -> "${dir}/filtered_feature_bc_matrix" }
-
-    output:
-    file "seurat_obj.rds" into seurat_objs
-
-    script:
-    """
-    Rscript '${params.r_script}' \\
-        --filtered-matrix '${filtered_matrix}' \\
-        --sample-name '${params.patient_id}'
-    """
-}
-
-process qcAndAnalyze {
-    executor 'local'
-    container 'rocker/r-ver:4.1.2' 
-    input:
-    file seurat_obj from seurat_objs
-
-    output:
-    file "${sample_name}_QC_befor.pdf"
-    file "${sample_name}_QC_after.pdf"
-    file "qc_filtered_seurat_obj.rds"
-
-    script:
-    """
-    Rscript '${workflow.projectDir}/qc_and_analyze.R' \\
-        --seurat-obj '${seurat_obj}' \\
-        --sample-name '${params.patient_id}' \\
-        --mt-thresh 10 \\
-        --max-features 2500
+        --localcores ${task.cpus} \\
+        --nosecondary
     """
 }
 
 process runCellRangerVDJ {
-    executor 'local'
+    executor "local"
     cpus 3
-    container 'cellranger:6.1.2'
+    container "cellranger:6.1.2"
 
     input:
     path(fastqs) from file("${tcr_fastqs_dir}/*.fastq.gz")
@@ -88,55 +57,71 @@ process runCellRangerVDJ {
     cellranger vdj \\
         --id ${params.patient_id}_TCR \\
         --sample ${params.patient_id}_FRTU_TIL_TCR \\
-        --fastqs ${fastqs} \\
+        --fastqs ${params.current_path}/${params.patient_id} \\
         --reference ${tcr_reference} \\
         --disable-ui \\
         --localcores ${task.cpus}
     """
 }
 
+process processSeurat {
+    executor "local"
+    container "rocker/r-ver:4.1.2"
+
+    input:
+    path filtered_matrix from cellranger_output.flatten().map { dir -> "${dir}/filtered_feature_bc_matrix" }
+
+    output:
+    file "seurat_obj.rds" into seurat_objs
+
+    script:
+    """
+    Rscript "${params.r_seurat}" \\
+        --filtered-matrix "${filtered_matrix}" \\
+        --sample-name "${params.patient_id}"
+    """
+}
+
+process qcAndAnalyze {
+    executor "local"
+    container "rocker/r-ver:4.1.2" 
+    input:
+    file seurat_obj from seurat_objs
+
+    output:
+    file "${sample_name}_QC_befor.pdf"
+    file "${sample_name}_QC_after.pdf"
+    file "qc_filtered_seurat_obj.rds"
+
+    script:
+    """
+    Rscript "${params.r_QCandanalyze}" \\
+        --seurat-obj "${seurat_obj}" \\
+        --sample-name "${params.patient_id}" \\
+        --mt-thresh 10 \\
+        --max-features 2500
+    """
+}
+
 process addTCRMetadata {
-    executor 'local'
-    container 'rocker/r-ver:4.1.2' 
+    executor "local"
+    container "rocker/r-ver:4.1.2" 
 
     input:
     file seurat_obj from qc_results.out.seurat_obj
     path tcr_annotations from "${params.patient_id}_TCR/outs/filtered_contig_annotations.csv.format.csv"
-    file react_list from './react_TCR_list.txt'
+    file react_list from "./react_TCR_list.txt"
 
     output:
     file "${params.patient_id}_QC_filtered_seurat_obj_with_TCR.rds"
 
     script:
     """
-    Rscript -e '
-        library(dplyr)
+    Rscript "${params.r_addTCR}" \\
+        --tcr_react "${params.tcr_react}"
+        --tcr_dir "./${params.patient_id}_TCR/outs/filtered_contig_annotations.csv.format.csv"
+    """
 
-        tcr_4261 <- read.csv(\"${tcr_annotations}\") %>%
-            select(cdr3_aa1, cdr3_aa2, CTaa, barcode_raw)
-
-        tcr_react_list <- read.table(\"${react_list}\", sep = \"\\t\", header = TRUE) %>%
-            select(CD4.CD8, CDR3A_B, Archival.Prospective, Tumor.ID)
-
-        metadata_add_TCR <- function(seurat_obj, tcr_df, tcr_react_df) {
-            patient_id <- seurat_obj@meta.data$orig.ident[1]
-            temp_mtx <- tcr_df %>%
-                remove_rownames() %>%
-                column_to_rownames(var = "barcode_raw")
-            temp_combined <- merge(seurat_obj@meta.data, temp_mtx, by = 0, sort = FALSE, all.x = TRUE)
-            temp_combined <- merge(temp_combined, subset(tcr_react_df, Tumor.ID == patient_id), by.x = "CTaa", by.y = "CDR3A_B", sort = FALSE, all.x = TRUE) %>%
-                remove_rownames() %>%
-                column_to_rownames(var = "Row.names")
-            raw_barcode <- row.names(seurat_obj@meta.data)
-            temp_combined <- temp_combined[raw_barcode, ]
-            seurat_obj@meta.data <- temp_combined
-            return(seurat_obj)
-        }
-
-        sc_4261_qc <- readRDS(\"${seurat_obj}\")
-        sc_4261_qc_TCR <- metadata_add_TCR(sc_4261_qc, tcr_4261, tcr_react_list)
-        saveRDS(sc_4261_qc_TCR, file=\"${params.patient_id}_QC_filtered_seurat_obj_with_TCR.rds\")
-    """ 
 }
 
 workflow {
@@ -167,7 +152,7 @@ workflow {
         addTCRMetadata(
             seurat_obj: result.out.seurat_obj,
             tcr_annotations: "${params.patient_id}_TCR/outs/filtered_contig_annotations.csv.format.csv",
-            react_list: './react_TCR_list.txt'
+            react_list: "./react_TCR_list.txt"
         )
     }
 }
