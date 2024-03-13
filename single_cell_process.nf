@@ -15,12 +15,14 @@ params {
     r_seurat = "./process_seurat.R"
     r_QCandanalyze = "./qc_and_analyze.R"
     r_addTCR = "./addTCRMetadata.R"
+    r_PCA = "./PCA.R"
+    r_HVG = "./HVG.R"
 }
 
 process runCellRangerCount {
     executor "local"
     cpus 3
-    container "cellranger:6.1.2"
+    // container "XXX"
 
     input:
     path(fastqs) from file("${fastqs_dir}/*.fastq.gz")
@@ -44,7 +46,7 @@ process runCellRangerCount {
 process runCellRangerVDJ {
     executor "local"
     cpus 3
-    container "cellranger:6.1.2"
+    // container "XXX"
 
     input:
     path(fastqs) from file("${tcr_fastqs_dir}/*.fastq.gz")
@@ -66,7 +68,7 @@ process runCellRangerVDJ {
 
 process processSeurat {
     executor "local"
-    container "rocker/r-ver:4.1.2"
+    // container "XXX"
 
     input:
     path filtered_matrix from cellranger_output.flatten().map { dir -> "${dir}/filtered_feature_bc_matrix" }
@@ -84,7 +86,8 @@ process processSeurat {
 
 process qcAndAnalyze {
     executor "local"
-    container "rocker/r-ver:4.1.2" 
+    // container "XXX" 
+
     input:
     file seurat_obj from seurat_objs
 
@@ -105,7 +108,7 @@ process qcAndAnalyze {
 
 process addTCRMetadata {
     executor "local"
-    container "rocker/r-ver:4.1.2" 
+    // container "XXX" 
 
     input:
     file seurat_obj from qc_results.out.seurat_obj
@@ -121,7 +124,37 @@ process addTCRMetadata {
         --tcr_react "${params.tcr_react}"
         --tcr_dir "./${params.patient_id}_TCR/outs/filtered_contig_annotations.csv.format.csv"
     """
+}
 
+process PCA {
+    executor "local"
+    // container "XXX" 
+
+    input:
+    
+    output:
+   
+    script:
+    """
+    Rscript "${params.r_PCA}" \\
+        --
+    """
+}
+
+process HVG {
+    executor "local"
+    // container "XXX" 
+
+    input:
+    
+    output:
+   
+
+    script:
+    """
+    Rscript "${params.r_HVG}" \\
+        --
+    """
 }
 
 workflow {
@@ -133,7 +166,6 @@ workflow {
         processSeurat(result)
     }
     
-    // 可选：收集并查看Seurat对象的输出路径
     seurat_objs.view()
 
     qc_results = seurat_objs.map { seurat_obj_path ->
