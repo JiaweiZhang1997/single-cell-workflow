@@ -24,8 +24,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # install miniconda
-ENV MINICONDA_VER=4.9.2
-RUN curl -sSLO https://repo.continuum.io/miniconda/Miniconda3-${MINICONDA_VER}-Linux-x86_64.sh && \
+ENV MINICONDA_VER="latest"
+
+RUN curl -sSLO https://repo.anaconda.com/miniconda/Miniconda3-${MINICONDA_VER}-Linux-x86_64.sh && \
     bash Miniconda3-${MINICONDA_VER}-Linux-x86_64.sh -b -p /usr/local/miniconda && \
     rm Miniconda3-${MINICONDA_VER}-Linux-x86_64.sh
 
@@ -36,9 +37,16 @@ RUN conda update -n base -c defaults conda
 # create work dir
 WORKDIR /opt/cellranger
 
+RUN conda config --add channels conda-forge
+RUN conda config --add channels bioconda
+
+# 添加特定的Anaconda服务器镜像源以加速下载
+RUN conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
+RUN conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
+
 # download and install Cell Ranger
-ARG CELLRANGER_VERSION=6.1.2
-RUN wget https:// downloads.10xgenomics.com/supp ort/single-cell-gene-expression/software/cellranger-${CELLRANGER_VERSION}.tar.gz && \
+ARG CELLRANGER_VERSION=7.2.0
+RUN wget -O cellranger-7.2.0.tar.gz "https://cf.10xgenomics.com/releases/cell-exp/cellranger-7.2.0.tar.gz?Expires=1710352364&Key-Pair-Id=APKAI7S6A5RYOXBWRPDA&Signature=LRLzaJH1XmSNYi3ZSZI4HoYiAbPO3K-l6JdTbv8oEIyLspg1ft2vZTGG64YAHB6RgPq9ynMUQrrkliAgyHoktB0jhJUeeWrlcmbbe-g4D4figj-Pn74-vdYWXYc9G09FOX3MCOFXYQaE8yj3PXfxON0QTGABkD0Q15W2rmnUbDf~8p9ZI5ocNsEfeWCdmTnj5bfqAsiUpfQ-N35VqO5pgHJ3JOsKrisuDdy0ZQD570zXRdLQsbJjGAFX5zJdKUvBvI6JKcCLN7j9mbWfxZ6T3j0jru0tJUgR7uqHUKhdy6aYiNSrOnlytbD9ICJ9mk4WSA965queZDGCsULOmFqoOA__" && \
     tar -xzvf cellranger-${CELLRANGER_VERSION}.tar.gz && \
     rm cellranger-${CELLRANGER_VERSION}.tar.gz
 
