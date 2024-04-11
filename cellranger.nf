@@ -6,18 +6,10 @@ params.patient_id = "4261"
 params.current_path = "/cache/jwzhang/phs002748.v1.p1/RNA_TIL"
 params.transcriptome_ref = "/cache/jwzhang/phs002748.v1.p1/refdata-gex-GRCh38-2020-A"
 params.tcr_reference = "/cache/jwzhang/phs002748.v1.p1/refdata-cellranger-vdj-GRCh38-alts-ensembl-5.0.0"
-params.r_process = "/cache/jwzhang/phs002748.v1.p1/RNA_TIL/nextflow/process.R"
-params.r_preprocess = "/cache/jwzhang/phs002748.v1.p1/RNA_TIL/nextflow/preprocess_tcr.R"
-params.mt_thresh = "10"
-params.max_features = "2500"
-params.tcr_react = "/cache/jwzhang/phs002748.v1.p1/RNA_TIL/output/react_TCR_list.txt"
-
-
 
 params.samples = [
-    [params.patient_id, params.current_path, params.transcriptome_ref, params.tcr_reference, params.mt_thresh, params.max_features, params.tcr_react]
+    [params.patient_id, params.current_path, params.transcriptome_ref, params.tcr_reference]
 ]
-
 
 process runCellRangerCount {
     executor "local"
