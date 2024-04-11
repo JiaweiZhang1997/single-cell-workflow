@@ -71,6 +71,7 @@ metadata_add_TCR <- function (seurat_obj, tcr_df, tcr_react_df){
 }
 
 sc_qc_TCR <- metadata_add_TCR(sc_qc, tcr, tcr_react_list)
+saveRDS(sc_qc_TCR, paste0(workdir, "/seurat_object.rds"))
 summary(sc_qc_TCR)
 
 
